@@ -21,104 +21,35 @@ A fully configurable, reusable related list component for Salesforce Lightning r
 
 ---
 
-## Architecture
-
-```
-force-app/main/default/
-├── classes/
-│   ├── SmartRelatedListController.cls          # Apex controller (4 endpoints)
-│   ├── SmartRelatedListController.cls-meta.xml
-│   ├── SmartRelatedListControllerTest.cls      # Test class (15 methods, ≥75% coverage)
-│   └── SmartRelatedListControllerTest.cls-meta.xml
-└── lwc/
-    ├── smartRelatedList/
-    │   ├── smartRelatedList.js                 # Main component controller
-    │   ├── smartRelatedList.html               # Template
-    │   ├── smartRelatedList.css                # Scoped styles
-    │   └── smartRelatedList.js-meta.xml        # App Builder config & properties
-    └── customDatatable/
-        ├── customDatatable.js                  # Extends lightning-datatable (picklist support)
-        ├── customDatatable.js-meta.xml
-        ├── picklistTemplate.html               # Read-only picklist cell
-        └── picklistEditTemplate.html           # Edit-mode picklist cell (HTML <select>)
-```
-
-### Data Flow
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Apex: SmartRelatedListController                           │
-│  ┌──────────────────┐  ┌────────────────┐  ┌────────────┐  │
-│  │ getColumnDefs    │  │ getRelatedRecs │  │ getObjLabel│  │
-│  │ (field metadata, │  │ (dynamic SOQL, │  │ (plural    │  │
-│  │  picklist values)│  │  up to 2000)   │  │  label)    │  │
-│  └────────┬─────────┘  └───────┬────────┘  └─────┬──────┘  │
-└───────────┼────────────────────┼──────────────────┼─────────┘
-            │ @wire              │ @wire             │ @wire
-┌───────────▼────────────────────▼──────────────────▼─────────┐
-│  LWC: smartRelatedList                                      │
-│                                                             │
-│  allRecords → filteredRecords → sortedRecords → paginated   │
-│  (server)     (search)          (column sort)    (page slice)│
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │  c-custom-datatable (extends lightning-datatable)    │    │
-│  │  + custom "picklist" column type                    │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## App Builder Properties
-
-Configure everything from the Lightning App Builder properties panel — no hardcoded values.
-
-| Property | Type | Required | Default | Description |
-|---|---|---|---|---|
-| **Card Title** | String | Yes | — | Header label displayed on the card (e.g. "Contacts"). |
-| **Child Object API Name** | String | Yes | — | API name of the child object to query (e.g. `Contact`). |
-| **Parent Lookup Field** | String | Yes | — | Lookup field on the child pointing to the parent (e.g. `AccountId`). |
-| **Fields to Display** | String | Yes | — | Comma-separated field API names for columns (e.g. `Name,Email,Phone`). |
-| **Sortable Fields** | String | No | All | Comma-separated field API names that should be sortable. Leave blank for all. |
-| **Row Limit** | Integer | No | 10 | Number of records displayed per page. |
-| **Enable Search** | Boolean | No | false | Show a search bar above the table. |
-| **Enable Inline Edit** | Boolean | No | false | Allow inline cell editing with Save All / Cancel buttons. |
-| **Enable CSV Export** | Boolean | No | false | Show an "Export CSV" button in the toolbar. |
-| **Color Field** | String | No | — | API name of a text/picklist field used for row colour coding. |
-| **Color Rules (JSON)** | String | No | — | JSON mapping field values to colour tokens (see below). |
-| **Primary Action Label** | String | No | — | Label for a row-level action button (e.g. "Edit"). |
-| **Enable New Record** | Boolean | No | false | Show a "New" button to create a child record. |
-
----
-
 ## Setup Instructions
 
 ### 1. Deploy to your org
 
-Deploy using Salesforce CLI:
+Click the button below to deploy directly to your Salesforce org (Production or Sandbox):
 
-```bash
-sf project deploy start \
-  --source-dir force-app/main/default/lwc/customDatatable \
-  --source-dir force-app/main/default/lwc/smartRelatedList \
-  --source-dir force-app/main/default/classes/SmartRelatedListController.cls \
-  --source-dir force-app/main/default/classes/SmartRelatedListController.cls-meta.xml \
-  --source-dir force-app/main/default/classes/SmartRelatedListControllerTest.cls \
-  --source-dir force-app/main/default/classes/SmartRelatedListControllerTest.cls-meta.xml \
-  --target-org <your-org-alias>
-```
+<a href="https://githubsfdeploy.herokuapp.com?owner=cyrilduv&repo=sf-smart-related-list&ref=main">
+  <img alt="Deploy to Salesforce" src="https://raw.githubusercontent.com/afawcett/githubsfdeploy/master/deploy.png">
+</a>
 
-### 2. Add to a record page
+### 2. Assign the permission set
+
+After deployment, assign the **Smart Related List User** permission set to users who need access:
+
+1. Go to **Setup → Permission Sets**.
+2. Click **Smart Related List User**.
+3. Click **Manage Assignments → Add Assignment**.
+4. Select the users and click **Assign**.
+
+### 3. Add to a record page
 
 1. Navigate to any record page (e.g. an Account record).
 2. Click the gear icon and select **Edit Page** to open Lightning App Builder.
 3. In the left panel, search for **"Smart Related List"**.
 4. Drag the component onto the page layout.
-5. Configure the properties in the right panel (see table above).
+5. Configure the properties in the right panel (see [App Builder Properties](#app-builder-properties) below).
 6. Click **Save** and **Activate** the page.
 
-### 3. Example: Contacts on an Account page
+### 4. Example: Contacts on an Account page
 
 | Property | Value |
 |---|---|
@@ -228,3 +159,76 @@ sf apex run test --class-names SmartRelatedListControllerTest --target-org <your
 - **Maximum 2,000 records** — the component loads up to 2,000 records in a single wire call. For objects with more related records, only the first 2,000 are available for search/sort/export.
 - **Mobile** — `lightning-datatable` has known limitations on mobile devices. This component is optimised for desktop use.
 - **Picklist inline edit** — uses a native HTML `<select>` instead of `lightning-combobox` due to event handling conflicts within custom datatable edit templates.
+
+---
+
+## Architecture
+
+```
+force-app/main/default/
+├── classes/
+│   ├── SmartRelatedListController.cls          # Apex controller (4 endpoints)
+│   ├── SmartRelatedListController.cls-meta.xml
+│   ├── SmartRelatedListControllerTest.cls      # Test class (15 methods, ≥75% coverage)
+│   └── SmartRelatedListControllerTest.cls-meta.xml
+├── lwc/
+│   ├── smartRelatedList/
+│   │   ├── smartRelatedList.js                 # Main component controller
+│   │   ├── smartRelatedList.html               # Template
+│   │   ├── smartRelatedList.css                # Scoped styles
+│   │   └── smartRelatedList.js-meta.xml        # App Builder config & properties
+│   └── customDatatable/
+│       ├── customDatatable.js                  # Extends lightning-datatable (picklist support)
+│       ├── customDatatable.js-meta.xml
+│       ├── picklistTemplate.html               # Read-only picklist cell
+│       └── picklistEditTemplate.html           # Edit-mode picklist cell (HTML <select>)
+└── permissionsets/
+    └── Smart_Related_List_User.permissionset-meta.xml
+```
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Apex: SmartRelatedListController                           │
+│  ┌──────────────────┐  ┌────────────────┐  ┌────────────┐  │
+│  │ getColumnDefs    │  │ getRelatedRecs │  │ getObjLabel│  │
+│  │ (field metadata, │  │ (dynamic SOQL, │  │ (plural    │  │
+│  │  picklist values)│  │  up to 2000)   │  │  label)    │  │
+│  └────────┬─────────┘  └───────┬────────┘  └─────┬──────┘  │
+└───────────┼────────────────────┼──────────────────┼─────────┘
+            │ @wire              │ @wire             │ @wire
+┌───────────▼────────────────────▼──────────────────▼─────────┐
+│  LWC: smartRelatedList                                      │
+│                                                             │
+│  allRecords → filteredRecords → sortedRecords → paginated   │
+│  (server)     (search)          (column sort)    (page slice)│
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  c-custom-datatable (extends lightning-datatable)    │    │
+│  │  + custom "picklist" column type                    │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## App Builder Properties
+
+Configure everything from the Lightning App Builder properties panel — no hardcoded values.
+
+| Property | Type | Required | Default | Description |
+|---|---|---|---|---|
+| **Card Title** | String | Yes | — | Header label displayed on the card (e.g. "Contacts"). |
+| **Child Object API Name** | String | Yes | — | API name of the child object to query (e.g. `Contact`). |
+| **Parent Lookup Field** | String | Yes | — | Lookup field on the child pointing to the parent (e.g. `AccountId`). |
+| **Fields to Display** | String | Yes | — | Comma-separated field API names for columns (e.g. `Name,Email,Phone`). |
+| **Sortable Fields** | String | No | All | Comma-separated field API names that should be sortable. Leave blank for all. |
+| **Row Limit** | Integer | No | 10 | Number of records displayed per page. |
+| **Enable Search** | Boolean | No | false | Show a search bar above the table. |
+| **Enable Inline Edit** | Boolean | No | false | Allow inline cell editing with Save All / Cancel buttons. |
+| **Enable CSV Export** | Boolean | No | false | Show an "Export CSV" button in the toolbar. |
+| **Color Field** | String | No | — | API name of a text/picklist field used for row colour coding. |
+| **Color Rules (JSON)** | String | No | — | JSON mapping field values to colour tokens (see [Row Colour Coding](#row-colour-coding)). |
+| **Primary Action Label** | String | No | — | Label for a row-level action button (e.g. "Edit"). |
+| **Enable New Record** | Boolean | No | false | Show a "New" button to create a child record. |
