@@ -2,6 +2,9 @@
 
 A fully configurable, reusable related list component for Salesforce Lightning record pages. Drop it onto any record page via Lightning App Builder and configure it entirely through point-and-click properties — no code changes needed.
 
+<img width="955" height="576" alt="Screenshot 2026-03-27 at 8 54 45 pm" src="https://github.com/user-attachments/assets/fd99d960-f38e-4b72-89f5-faa8f3ba93b5" />
+
+
 ---
 
 ## Features
