@@ -1,0 +1,138 @@
+<template>
+    <lightning-card title={cardHeader} icon-name="standard:related_list">
+
+        <!-- ═══ Toolbar: Search (left) · New / Export (right) ═══ -->
+        <div class="slds-grid slds-grid_vertical-align-center slds-var-p-horizontal_small slds-var-p-bottom_xx-small toolbar">
+
+            <!-- Search bar (conditional) -->
+            <div class="slds-col slds-grow">
+                <template lwc:if={enableSearch}>
+                    <lightning-input
+                        type="search"
+                        label="Search"
+                        variant="label-hidden"
+                        placeholder="Search…"
+                        value={searchTerm}
+                        onchange={handleSearchChange}>
+                    </lightning-input>
+                </template>
+            </div>
+
+            <!-- Action buttons (conditional) -->
+            <div class="slds-col slds-no-flex slds-grid slds-gutters_xx-small">
+                <template lwc:if={hasUnsavedChanges}>
+                    <div class="slds-col">
+                        <lightning-button
+                            label="Save All"
+                            variant="brand"
+                            icon-name="utility:save"
+                            onclick={handleSaveAll}>
+                        </lightning-button>
+                    </div>
+                    <div class="slds-col">
+                        <lightning-button
+                            label="Cancel"
+                            variant="neutral"
+                            icon-name="utility:undo"
+                            onclick={handleCancelEdit}>
+                        </lightning-button>
+                    </div>
+                </template>
+                <template lwc:if={enableNewRecord}>
+                    <div class="slds-col">
+                        <lightning-button
+                            label="New"
+                            variant="neutral"
+                            icon-name="utility:add"
+                            onclick={handleNewRecord}>
+                        </lightning-button>
+                    </div>
+                </template>
+                <template lwc:if={enableExport}>
+                    <div class="slds-col">
+                        <lightning-button
+                            label="Export CSV"
+                            icon-name="utility:download"
+                            onclick={handleExportCsv}
+                            variant="neutral"
+                            disabled={noData}>
+                        </lightning-button>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- ═══ Loading spinner ═══ -->
+        <template lwc:if={isLoading}>
+            <div class="slds-is-relative spinner-container">
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <!-- ═══ Datatable or empty state ═══ -->
+        <template lwc:if={hasColumns}>
+
+            <!-- Empty state -->
+            <template lwc:if={noData}>
+                <div class="slds-align_absolute-center slds-var-p-around_large empty-state">
+                    <div class="slds-text-align_center">
+                        <lightning-icon icon-name="standard:empty_state" size="large"
+                                        class="slds-var-m-bottom_small"></lightning-icon>
+                        <p class="slds-text-heading_small slds-text-color_weak slds-var-m-top_small">
+                            {emptyMessage}
+                        </p>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Datatable (c-custom-datatable extends lightning-datatable with picklist support) -->
+            <template lwc:else>
+                <div class="table-container">
+                    <c-custom-datatable
+                        key-field="Id"
+                        data={paginatedRecords}
+                        columns={activeColumns}
+                        draft-values={draftValues}
+                        oncellchange={handleCellChange}
+                        onsave={handleSaveAll}
+                        oncancel={handleCancelEdit}
+                        onrowaction={handleRowAction}
+                        onsort={handleSort}
+                        sorted-by={sortedBy}
+                        sorted-direction={sortedDirection}
+                        hide-checkbox-column
+                        show-row-number-column>
+                    </c-custom-datatable>
+                </div>
+            </template>
+        </template>
+
+        <!-- ═══ Pagination ═══ -->
+        <template lwc:if={showPagination}>
+            <div class="slds-grid slds-grid_align-center slds-grid_vertical-align-center slds-var-p-vertical_x-small pagination-bar">
+                <lightning-button
+                    label="Previous"
+                    icon-name="utility:chevronleft"
+                    onclick={handlePreviousPage}
+                    disabled={isFirstPage}>
+                </lightning-button>
+                <span class="slds-var-p-horizontal_small slds-align-middle slds-text-body_small">
+                    {paginationLabel}
+                </span>
+                <lightning-button
+                    label="Next"
+                    icon-name="utility:chevronright"
+                    icon-position="right"
+                    onclick={handleNextPage}
+                    disabled={isLastPage}>
+                </lightning-button>
+            </div>
+        </template>
+
+        <!-- ═══ Error banner ═══ -->
+        <template lwc:if={errorMessage}>
+            <div class="slds-var-p-around_small slds-text-color_error">{errorMessage}</div>
+        </template>
+
+    </lightning-card>
+</template>

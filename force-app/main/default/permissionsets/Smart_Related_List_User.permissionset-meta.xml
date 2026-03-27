@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Smart Related List User</label>
+    <description>Grants access to the Smart Related List LWC component and its Apex controller.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <classAccesses>
+        <apexClass>SmartRelatedListController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+</PermissionSet>

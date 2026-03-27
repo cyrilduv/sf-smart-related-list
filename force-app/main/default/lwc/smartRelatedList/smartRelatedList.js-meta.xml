@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Smart Related List</masterLabel>
+    <description>Configurable related list with inline edit, colour coding, search, and CSV export.</description>
+    <targets>
+        <target>lightning__RecordPage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__RecordPage">
+            <property name="title" type="String" required="true"
+                      label="Card Title"
+                      description="Header label for the card (e.g. Contacts)." />
+            <property name="childObjectApiName" type="String" required="true"
+                      label="Child Object API Name"
+                      description="API name of the child object to query (e.g. Contact)." />
+            <property name="parentFieldApiName" type="String" required="true"
+                      label="Parent Lookup Field"
+                      description="Lookup field on the child that relates to the parent record (e.g. AccountId)." />
+            <property name="fieldsToDisplay" type="String" required="true"
+                      label="Fields to Display"
+                      description="Comma-separated field API names to show as columns (e.g. Name,Email,Phone)." />
+            <property name="sortableFields" type="String" required="false"
+                      label="Sortable Fields"
+                      description="Comma-separated field API names that should be sortable." />
+            <property name="rowLimit" type="Integer" default="10"
+                      label="Row Limit"
+                      description="Max rows per page (default 10)." />
+            <property name="enableSearch" type="Boolean" default="false"
+                      label="Enable Search"
+                      description="Show a search bar above the table." />
+            <property name="enableInlineEdit" type="Boolean" default="false"
+                      label="Enable Inline Edit"
+                      description="Allow inline cell editing with a Save All button." />
+            <property name="enableExport" type="Boolean" default="false"
+                      label="Enable CSV Export"
+                      description="Show a CSV export button." />
+            <property name="colorField" type="String" required="false"
+                      label="Color Field"
+                      description="API name of a text/picklist field used to drive row colour coding." />
+            <property name="colorRules" type="String" required="false"
+                      label="Color Rules (JSON)"
+                      description='JSON mapping field values to colour tokens e.g. {"Hot":"red","Warm":"orange","Cold":"blue"}.' />
+            <property name="primaryActionLabel" type="String" required="false"
+                      label="Primary Action Label"
+                      description="Label for row-level primary action button (e.g. Edit)." />
+            <property name="enableNewRecord" type="Boolean" default="false"
+                      label="Enable New Record"
+                      description="Show a New button to create a child record." />
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

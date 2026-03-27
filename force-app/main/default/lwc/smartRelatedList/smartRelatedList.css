@@ -1,0 +1,36 @@
+/**
+ * smartRelatedList — Scoped styles.
+ *
+ * Row colour-coding is applied via inline styles (cellAttributes.style)
+ * because CSS classes defined here cannot penetrate into lightning-datatable's
+ * shadow DOM. The hex values are defined as constants in the JS controller.
+ */
+
+:host {
+    display: block;
+}
+
+/* Minimum height prevents layout shift while data loads */
+.table-container {
+    min-height: 200px;
+}
+
+/* Spinner needs a positioned ancestor for absolute centering */
+.spinner-container {
+    min-height: 120px;
+}
+
+/* Illustration + message area when no records match */
+.empty-state {
+    min-height: 160px;
+}
+
+/* Toolbar row above the datatable */
+.toolbar {
+    min-height: 36px;
+}
+
+/* Visual separator between table and pagination controls */
+.pagination-bar {
+    border-top: 1px solid #e5e5e5;
+}
