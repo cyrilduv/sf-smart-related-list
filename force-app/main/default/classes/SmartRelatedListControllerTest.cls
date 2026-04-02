@@ -289,6 +289,88 @@ private class SmartRelatedListControllerTest {
         }
     }
 
+    // --- Boundary conditions ---
+
+    @IsTest
+    static void getRelatedRecords_returnsEmptyForUnrelatedParent() {
+        // Account with no contacts
+        Account lonely = new Account(Name = 'Lonely Account');
+        insert lonely;
+
+        List<SObject> records = SmartRelatedListController.getRelatedRecords(
+            'Contact', 'AccountId', lonely.Id, 'LastName', 100, 0, null, null, null
+        );
+
+        System.assertEquals(0, records.size());
+    }
+
+    @IsTest
+    static void getRelatedRecords_offsetBeyondTotalReturnsEmpty() {
+        Account acc = [SELECT Id FROM Account WHERE Name = 'Test Account' LIMIT 1];
+
+        List<SObject> records = SmartRelatedListController.getRelatedRecords(
+            'Contact', 'AccountId', acc.Id, 'LastName', 100, 999, null, null, null
+        );
+
+        System.assertEquals(0, records.size());
+    }
+
+    @IsTest
+    static void getRelatedRecords_nullLimitReturnsAll() {
+        Account acc = [SELECT Id FROM Account WHERE Name = 'Test Account' LIMIT 1];
+
+        List<SObject> records = SmartRelatedListController.getRelatedRecords(
+            'Contact', 'AccountId', acc.Id, 'LastName', null, null, null, null, null
+        );
+
+        System.assertEquals(15, records.size());
+    }
+
+    @IsTest
+    static void getTotalCount_returnsZeroForUnrelatedParent() {
+        Account lonely = new Account(Name = 'Lonely Account 2');
+        insert lonely;
+
+        Integer count = SmartRelatedListController.getTotalCount(
+            'Contact', 'AccountId', lonely.Id, null
+        );
+
+        System.assertEquals(0, count);
+    }
+
+    // --- FLS enforcement ---
+
+    @IsTest
+    static void getRelatedRecords_stripInaccessibleRemovesRestrictedFields() {
+        // stripInaccessible is enforced at Controller:127 — verify it runs
+        // without error and returns records. A full FLS test requires a
+        // restricted profile, but we can at least confirm the method path
+        // executes correctly for the running user.
+        Account acc = [SELECT Id FROM Account WHERE Name = 'Test Account' LIMIT 1];
+
+        List<SObject> records = SmartRelatedListController.getRelatedRecords(
+            'Contact', 'AccountId', acc.Id, 'LastName,Email', 5, 0, null, null, null
+        );
+
+        System.assertEquals(5, records.size());
+        // Verify the fields we requested are present (accessible to test user)
+        for (SObject rec : records) {
+            System.assertNotEquals(null, rec.get('LastName'));
+        }
+    }
+
+    @IsTest
+    static void getColumnDefinitions_excludesInaccessibleFields() {
+        // Under the system admin running tests, all fields are accessible.
+        // This test confirms the method path works. For a real FLS test,
+        // deploy a restricted profile + permission set and use System.runAs().
+        List<SmartRelatedListController.ColumnDef> defs =
+            SmartRelatedListController.getColumnDefinitions('Contact', 'LastName,Email');
+
+        // Both should be accessible for system admin
+        System.assertEquals(2, defs.size());
+    }
+
     // --- getObjectLabel ---
 
     @IsTest

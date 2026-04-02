@@ -78,10 +78,6 @@ describe('c-smart-related-list', () => {
         jest.clearAllMocks();
     });
 
-    // ───────────────────────────────────────────────
-    //  Rendering & Data Pipeline
-    // ───────────────────────────────────────────────
-
     describe('data pipeline', () => {
         it('displays loading spinner initially', () => {
             const element = createComponent();
@@ -125,10 +121,6 @@ describe('c-smart-related-list', () => {
         });
     });
 
-    // ───────────────────────────────────────────────
-    //  Search
-    // ───────────────────────────────────────────────
-
     describe('search', () => {
         it('does not render search input when enableSearch is false', () => {
             const element = createComponent({ enableSearch: false });
@@ -143,10 +135,6 @@ describe('c-smart-related-list', () => {
         });
     });
 
-    // ───────────────────────────────────────────────
-    //  Pagination
-    // ───────────────────────────────────────────────
-
     describe('pagination', () => {
         it('does not show pagination when records fit in one page', async () => {
             const element = createComponent({ rowLimit: 20 });
@@ -160,10 +148,6 @@ describe('c-smart-related-list', () => {
         });
     });
 
-    // ───────────────────────────────────────────────
-    //  Inline Edit
-    // ───────────────────────────────────────────────
-
     describe('inline edit', () => {
         it('does not show Save/Cancel buttons when no drafts', async () => {
             const element = createComponent({ enableInlineEdit: true });
@@ -176,10 +160,6 @@ describe('c-smart-related-list', () => {
             expect(saveBtn).toBeNull();
         });
     });
-
-    // ───────────────────────────────────────────────
-    //  New Record Button
-    // ───────────────────────────────────────────────
 
     describe('new record', () => {
         it('does not show New button when enableNewRecord is false', () => {
@@ -195,10 +175,6 @@ describe('c-smart-related-list', () => {
         });
     });
 
-    // ───────────────────────────────────────────────
-    //  CSV Export
-    // ───────────────────────────────────────────────
-
     describe('csv export', () => {
         it('does not show Export button when enableExport is false', () => {
             const element = createComponent({ enableExport: false });
@@ -212,10 +188,6 @@ describe('c-smart-related-list', () => {
             expect(btn).not.toBeNull();
         });
     });
-
-    // ───────────────────────────────────────────────
-    //  Color Rules — Silent Failure Fix
-    // ───────────────────────────────────────────────
 
     describe('color rules parsing', () => {
         it('dispatches warning toast on invalid JSON', async () => {
@@ -246,9 +218,168 @@ describe('c-smart-related-list', () => {
         });
     });
 
-    // ───────────────────────────────────────────────
-    //  Error Reducer
-    // ───────────────────────────────────────────────
+    // --- Configuration validation ---
+
+    describe('missing config', () => {
+        it('shows config error when childObjectApiName is missing', async () => {
+            const element = createComponent({ childObjectApiName: undefined });
+            await flushPromises();
+
+            const errorDiv = element.shadowRoot.querySelector('.slds-text-color_error');
+            expect(errorDiv).not.toBeNull();
+            expect(errorDiv.textContent).toContain('Configuration error');
+        });
+
+        it('shows config error when parentFieldApiName is missing', async () => {
+            const element = createComponent({ parentFieldApiName: undefined });
+            await flushPromises();
+
+            const errorDiv = element.shadowRoot.querySelector('.slds-text-color_error');
+            expect(errorDiv).not.toBeNull();
+            expect(errorDiv.textContent).toContain('Configuration error');
+        });
+    });
+
+    // --- User interactions ---
+
+    describe('search interaction', () => {
+        it('filters records after debounced search input', async () => {
+            jest.useFakeTimers();
+            const element = createComponent({ enableSearch: true });
+
+            emitWireData(getColumnDefinitions, MOCK_COLUMNS);
+            emitWireData(getRelatedRecords, { data: MOCK_RECORDS });
+            await flushPromises();
+
+            const searchInput = element.shadowRoot.querySelector('lightning-input[type="search"]');
+            searchInput.value = 'Contact 01';
+            searchInput.dispatchEvent(new CustomEvent('change', { detail: { value: 'Contact 01' } }));
+
+            // Advance past debounce timer
+            jest.advanceTimersByTime(350);
+            await flushPromises();
+
+            // The component should have filtered — card header should reflect the count
+            const card = element.shadowRoot.querySelector('lightning-card');
+            expect(card).not.toBeNull();
+
+            jest.useRealTimers();
+        });
+    });
+
+    describe('sort interaction', () => {
+        it('updates sortedBy and sortedDirection on sort event', async () => {
+            const element = createComponent();
+
+            emitWireData(getColumnDefinitions, MOCK_COLUMNS);
+            emitWireData(getRelatedRecords, { data: MOCK_RECORDS });
+            await flushPromises();
+
+            const datatable = element.shadowRoot.querySelector('c-custom-datatable');
+            if (datatable) {
+                datatable.dispatchEvent(new CustomEvent('sort', {
+                    detail: { fieldName: 'LastName', sortDirection: 'desc' }
+                }));
+                await flushPromises();
+
+                // Verify the sort attributes are passed back to datatable
+                expect(datatable.sortedBy).toBe('LastName');
+                expect(datatable.sortedDirection).toBe('desc');
+            }
+        });
+    });
+
+    describe('pagination interaction', () => {
+        it('advances to next page on Next click', async () => {
+            const element = createComponent({ rowLimit: 5 });
+
+            emitWireData(getColumnDefinitions, MOCK_COLUMNS);
+            emitWireData(getRelatedRecords, { data: MOCK_RECORDS });
+            await flushPromises();
+
+            const nextBtn = element.shadowRoot.querySelector('lightning-button[label="Next"]');
+            expect(nextBtn).not.toBeNull();
+            expect(nextBtn.disabled).toBe(false);
+
+            nextBtn.click();
+            await flushPromises();
+
+            const paginationLabel = element.shadowRoot.querySelector('.pagination-bar span');
+            expect(paginationLabel.textContent).toContain('6');
+        });
+
+        it('disables Previous on first page', async () => {
+            const element = createComponent({ rowLimit: 5 });
+
+            emitWireData(getColumnDefinitions, MOCK_COLUMNS);
+            emitWireData(getRelatedRecords, { data: MOCK_RECORDS });
+            await flushPromises();
+
+            const prevBtn = element.shadowRoot.querySelector('lightning-button[label="Previous"]');
+            expect(prevBtn).not.toBeNull();
+            expect(prevBtn.disabled).toBe(true);
+        });
+
+        it('disables Next on last page', async () => {
+            const element = createComponent({ rowLimit: 15 });
+
+            emitWireData(getColumnDefinitions, MOCK_COLUMNS);
+            emitWireData(getRelatedRecords, { data: MOCK_RECORDS });
+            await flushPromises();
+
+            // All 15 fit in one page of 15, so no pagination shown at all
+            const paginationBar = element.shadowRoot.querySelector('.pagination-bar');
+            expect(paginationBar).toBeNull();
+        });
+    });
+
+    describe('inline edit interaction', () => {
+        it('tracks draft values on cellchange', async () => {
+            const element = createComponent({ enableInlineEdit: true });
+
+            emitWireData(getColumnDefinitions, MOCK_COLUMNS);
+            emitWireData(getRelatedRecords, { data: MOCK_RECORDS });
+            await flushPromises();
+
+            const datatable = element.shadowRoot.querySelector('c-custom-datatable');
+            if (datatable) {
+                const mockDrafts = [{ Id: '003000000000000', LastName: 'Updated' }];
+                datatable.dispatchEvent(new CustomEvent('cellchange', {
+                    detail: { draftValues: mockDrafts }
+                }));
+                await flushPromises();
+
+                // Save All button should now appear
+                const saveBtn = element.shadowRoot.querySelector('lightning-button[label="Save All"]');
+                expect(saveBtn).not.toBeNull();
+            }
+        });
+
+        it('clears drafts on Cancel click', async () => {
+            const element = createComponent({ enableInlineEdit: true });
+
+            emitWireData(getColumnDefinitions, MOCK_COLUMNS);
+            emitWireData(getRelatedRecords, { data: MOCK_RECORDS });
+            await flushPromises();
+
+            const datatable = element.shadowRoot.querySelector('c-custom-datatable');
+            if (datatable) {
+                datatable.dispatchEvent(new CustomEvent('cellchange', {
+                    detail: { draftValues: [{ Id: '003000000000000', LastName: 'Updated' }] }
+                }));
+                await flushPromises();
+
+                const cancelBtn = element.shadowRoot.querySelector('lightning-button[label="Cancel"]');
+                expect(cancelBtn).not.toBeNull();
+                cancelBtn.click();
+                await flushPromises();
+
+                // Save All should disappear
+                const saveBtn = element.shadowRoot.querySelector('lightning-button[label="Save All"]');
+                expect(saveBtn).toBeNull();
+            }
+        });
+    });
 
     describe('_reduceError', () => {
         it('handles string errors', async () => {

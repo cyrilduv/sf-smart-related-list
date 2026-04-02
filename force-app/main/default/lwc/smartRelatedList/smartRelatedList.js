@@ -57,6 +57,13 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
     _parsedColorRules;
 
     connectedCallback() {
+        if (!this.childObjectApiName || !this.parentFieldApiName) {
+            this.errorMessage = 'Configuration error: "Child Object API Name" and "Parent Field API Name" are required. '
+                + 'Check the component properties in Lightning App Builder.';
+            this.isLoading = false;
+            return;
+        }
+
         this._sortableSet = this.sortableFields
             ? new Set(this.sortableFields.split(',').map(f => f.trim()))
             : null;
@@ -71,6 +78,8 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         if (data) {
             this.objectLabel = data;
         } else if (error) {
+            // eslint-disable-next-line no-console
+            console.warn('[smartRelatedList] Could not fetch object label:', this._reduceError(error));
             this.objectLabel = this.childObjectApiName;
         }
     }
