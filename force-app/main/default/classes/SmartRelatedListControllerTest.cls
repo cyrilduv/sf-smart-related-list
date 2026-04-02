@@ -22,7 +22,7 @@ private class SmartRelatedListControllerTest {
     // --- getColumnDefinitions ---
 
     @IsTest
-    static void getColumnDefinitions_returnsRequestedFields() {
+    static void columnDefsReturnsRequestedFields() {
         List<SmartRelatedListController.ColumnDef> defs =
             SmartRelatedListController.getColumnDefinitions('Contact', 'LastName,Email,Phone');
 
@@ -40,7 +40,7 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getColumnDefinitions_defaultsToNameWhenEmpty() {
+    static void columnDefsDefaultsToNameWhenEmpty() {
         List<SmartRelatedListController.ColumnDef> defs =
             SmartRelatedListController.getColumnDefinitions('Contact', '');
 
@@ -49,22 +49,22 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getColumnDefinitions_returnsPicklistValues() {
+    static void columnDefsReturnsPicklistValues() {
         List<SmartRelatedListController.ColumnDef> defs =
             SmartRelatedListController.getColumnDefinitions('Contact', 'LeadSource');
 
-        System.assertEquals(1, defs.size());
-        System.assertEquals('PICKLIST', defs[0].type);
-        System.assertNotEquals(null, defs[0].picklistValues);
-        System.assert(defs[0].picklistValues.size() > 0);
+        System.assertEquals(1, defs.size(), 'Should return one column');
+        System.assertEquals('PICKLIST', defs[0].type, 'Type should be PICKLIST');
+        System.assertNotEquals(null, defs[0].picklistValues, 'Should include picklist values');
+        System.assert(defs[0].picklistValues.size() > 0, 'Picklist values should not be empty');
 
         SmartRelatedListController.PicklistOption firstOpt = defs[0].picklistValues[0];
-        System.assertNotEquals(null, firstOpt.label);
-        System.assertNotEquals(null, firstOpt.value);
+        System.assertNotEquals(null, firstOpt.label, 'Option should have a label');
+        System.assertNotEquals(null, firstOpt.value, 'Option should have a value');
     }
 
     @IsTest
-    static void getColumnDefinitions_throwsOnInvalidObject() {
+    static void columnDefsThrowsOnInvalidObject() {
         try {
             SmartRelatedListController.getColumnDefinitions('FakeObject__x', 'Name');
             System.assert(false, 'Should have thrown');
@@ -74,7 +74,7 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getColumnDefinitions_throwsOnInvalidField() {
+    static void columnDefsThrowsOnInvalidField() {
         try {
             SmartRelatedListController.getColumnDefinitions('Contact', 'TotallyFakeField__c');
             System.assert(false, 'Should have thrown');
@@ -84,7 +84,7 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getColumnDefinitions_populatesUpdateableFlag() {
+    static void columnDefsPopulatesUpdateableFlag() {
         List<SmartRelatedListController.ColumnDef> defs =
             SmartRelatedListController.getColumnDefinitions('Contact', 'LastName,AccountId');
 
@@ -97,36 +97,36 @@ private class SmartRelatedListControllerTest {
     // --- getRelatedRecords ---
 
     @IsTest
-    static void getRelatedRecords_respectsRowLimit() {
+    static void relatedRecordsRespectsRowLimit() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
             'Contact', 'AccountId', acc.Id, 'LastName,Email', 10, 0, null, null, null
         );
 
-        System.assertEquals(10, records.size());
+        System.assertEquals(10, records.size(), 'Should return exactly 10 records');
     }
 
     @IsTest
-    static void getRelatedRecords_respectsOffset() {
+    static void relatedRecordsRespectsOffset() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
             'Contact', 'AccountId', acc.Id, 'LastName,Email', 100, 10, null, null, null
         );
 
-        System.assertEquals(5, records.size());
+        System.assertEquals(5, records.size(), 'Should return remaining 5 records');
     }
 
     @IsTest
-    static void getRelatedRecords_sortsAscending() {
+    static void relatedRecordsSortsAscending() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
             'Contact', 'AccountId', acc.Id, 'LastName', 15, 0, 'LastName', 'asc', null
         );
 
-        System.assertEquals(15, records.size());
+        System.assertEquals(15, records.size(), 'Should return all 15 contacts');
         String prev = '';
         for (SObject rec : records) {
             String current = (String) rec.get('LastName');
@@ -137,14 +137,14 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getRelatedRecords_sortsDescending() {
+    static void relatedRecordsSortsDescending() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
             'Contact', 'AccountId', acc.Id, 'LastName', 15, 0, 'LastName', 'desc', null
         );
 
-        System.assertEquals(15, records.size());
+        System.assertEquals(15, records.size(), 'Should return all 15 contacts');
         String prev = 'zzzzz';
         for (SObject rec : records) {
             String current = (String) rec.get('LastName');
@@ -155,30 +155,30 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getRelatedRecords_filtersOnSearchTerm() {
+    static void relatedRecordsFiltersOnSearchTerm() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
             'Contact', 'AccountId', acc.Id, 'LastName,Email', 50, 0, null, null, 'Contact 01'
         );
 
-        System.assertEquals(1, records.size());
+        System.assertEquals(1, records.size(), 'Should match exactly 1 record');
     }
 
     @IsTest
-    static void getRelatedRecords_returnsIdField() {
+    static void relatedRecordsReturnsIdField() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
             'Contact', 'AccountId', acc.Id, 'LastName', 1, 0, null, null, null
         );
 
-        System.assertEquals(1, records.size());
-        System.assertNotEquals(null, records[0].Id);
+        System.assertEquals(1, records.size(), 'Should return 1 record');
+        System.assertNotEquals(null, records[0].Id, 'Record should include Id');
     }
 
     @IsTest
-    static void getRelatedRecords_throwsOnInvalidObject() {
+    static void relatedRecordsThrowsOnInvalidObject() {
         try {
             SmartRelatedListController.getRelatedRecords(
                 'FakeObject__x', 'AccountId', UserInfo.getUserId(), 'Name', 10, 0, null, null, null
@@ -190,7 +190,7 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getRelatedRecords_throwsOnBlankObject() {
+    static void relatedRecordsThrowsOnBlankObject() {
         try {
             SmartRelatedListController.getRelatedRecords(
                 '', 'AccountId', UserInfo.getUserId(), 'Name', 10, 0, null, null, null
@@ -202,7 +202,7 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getRelatedRecords_throwsOnInvalidParentField() {
+    static void relatedRecordsThrowsOnInvalidParentField() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
         try {
             SmartRelatedListController.getRelatedRecords(
@@ -215,7 +215,7 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getRelatedRecords_throwsOnInvalidSortField() {
+    static void relatedRecordsThrowsOnInvalidSortField() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
         try {
             SmartRelatedListController.getRelatedRecords(
@@ -228,7 +228,7 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getRelatedRecords_throwsOnInvalidSelectField() {
+    static void relatedRecordsThrowsOnInvalidSelectField() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
         try {
             SmartRelatedListController.getRelatedRecords(
@@ -243,29 +243,29 @@ private class SmartRelatedListControllerTest {
     // --- getTotalCount ---
 
     @IsTest
-    static void getTotalCount_returnsAllRecords() {
+    static void totalCountReturnsAllRecords() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         Integer count = SmartRelatedListController.getTotalCount(
             'Contact', 'AccountId', acc.Id, null
         );
 
-        System.assertEquals(15, count);
+        System.assertEquals(15, count, 'Should count all 15 contacts');
     }
 
     @IsTest
-    static void getTotalCount_filtersOnSearchTerm() {
+    static void totalCountFiltersOnSearchTerm() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         Integer count = SmartRelatedListController.getTotalCount(
             'Contact', 'AccountId', acc.Id, 'Contact 01'
         );
 
-        System.assertEquals(1, count);
+        System.assertEquals(1, count, 'Should match exactly 1 record');
     }
 
     @IsTest
-    static void getTotalCount_throwsOnInvalidObject() {
+    static void totalCountThrowsOnInvalidObject() {
         try {
             SmartRelatedListController.getTotalCount(
                 'FakeObject__x', 'AccountId', UserInfo.getUserId(), null
@@ -277,7 +277,7 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getTotalCount_throwsOnInvalidParentField() {
+    static void totalCountThrowsOnInvalidParentField() {
         Account acc = [SELECT Id FROM Account LIMIT 1];
         try {
             SmartRelatedListController.getTotalCount(
@@ -292,8 +292,7 @@ private class SmartRelatedListControllerTest {
     // --- Boundary conditions ---
 
     @IsTest
-    static void getRelatedRecords_returnsEmptyForUnrelatedParent() {
-        // Account with no contacts
+    static void relatedRecordsReturnsEmptyForUnrelatedParent() {
         Account lonely = new Account(Name = 'Lonely Account');
         insert lonely;
 
@@ -301,33 +300,33 @@ private class SmartRelatedListControllerTest {
             'Contact', 'AccountId', lonely.Id, 'LastName', 100, 0, null, null, null
         );
 
-        System.assertEquals(0, records.size());
+        System.assertEquals(0, records.size(), 'Unrelated parent should return 0 records');
     }
 
     @IsTest
-    static void getRelatedRecords_offsetBeyondTotalReturnsEmpty() {
+    static void relatedRecordsOffsetBeyondTotalReturnsEmpty() {
         Account acc = [SELECT Id FROM Account WHERE Name = 'Test Account' LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
             'Contact', 'AccountId', acc.Id, 'LastName', 100, 999, null, null, null
         );
 
-        System.assertEquals(0, records.size());
+        System.assertEquals(0, records.size(), 'Offset beyond total should return 0');
     }
 
     @IsTest
-    static void getRelatedRecords_nullLimitReturnsAll() {
+    static void relatedRecordsNullLimitReturnsAll() {
         Account acc = [SELECT Id FROM Account WHERE Name = 'Test Account' LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
             'Contact', 'AccountId', acc.Id, 'LastName', null, null, null, null, null
         );
 
-        System.assertEquals(15, records.size());
+        System.assertEquals(15, records.size(), 'Null limit should return all records');
     }
 
     @IsTest
-    static void getTotalCount_returnsZeroForUnrelatedParent() {
+    static void totalCountReturnsZeroForUnrelatedParent() {
         Account lonely = new Account(Name = 'Lonely Account 2');
         insert lonely;
 
@@ -335,52 +334,43 @@ private class SmartRelatedListControllerTest {
             'Contact', 'AccountId', lonely.Id, null
         );
 
-        System.assertEquals(0, count);
+        System.assertEquals(0, count, 'Unrelated parent should count 0');
     }
 
     // --- FLS enforcement ---
 
     @IsTest
-    static void getRelatedRecords_stripInaccessibleRemovesRestrictedFields() {
-        // stripInaccessible is enforced at Controller:127 — verify it runs
-        // without error and returns records. A full FLS test requires a
-        // restricted profile, but we can at least confirm the method path
-        // executes correctly for the running user.
+    static void relatedRecordsStripInaccessiblePath() {
         Account acc = [SELECT Id FROM Account WHERE Name = 'Test Account' LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
             'Contact', 'AccountId', acc.Id, 'LastName,Email', 5, 0, null, null, null
         );
 
-        System.assertEquals(5, records.size());
-        // Verify the fields we requested are present (accessible to test user)
+        System.assertEquals(5, records.size(), 'Should return 5 records');
         for (SObject rec : records) {
-            System.assertNotEquals(null, rec.get('LastName'));
+            System.assertNotEquals(null, rec.get('LastName'), 'LastName should be accessible');
         }
     }
 
     @IsTest
-    static void getColumnDefinitions_excludesInaccessibleFields() {
-        // Under the system admin running tests, all fields are accessible.
-        // This test confirms the method path works. For a real FLS test,
-        // deploy a restricted profile + permission set and use System.runAs().
+    static void columnDefsExcludesInaccessibleFields() {
         List<SmartRelatedListController.ColumnDef> defs =
             SmartRelatedListController.getColumnDefinitions('Contact', 'LastName,Email');
 
-        // Both should be accessible for system admin
-        System.assertEquals(2, defs.size());
+        System.assertEquals(2, defs.size(), 'Both fields should be accessible for admin');
     }
 
     // --- getObjectLabel ---
 
     @IsTest
-    static void getObjectLabel_returnsPluralLabel() {
+    static void objectLabelReturnsPluralLabel() {
         String label = SmartRelatedListController.getObjectLabel('Contact');
-        System.assertEquals('Contacts', label);
+        System.assertEquals('Contacts', label, 'Plural label should be Contacts');
     }
 
     @IsTest
-    static void getObjectLabel_throwsOnInvalidObject() {
+    static void objectLabelThrowsOnInvalidObject() {
         try {
             SmartRelatedListController.getObjectLabel('FakeObject__x');
             System.assert(false, 'Should have thrown');
@@ -390,7 +380,7 @@ private class SmartRelatedListControllerTest {
     }
 
     @IsTest
-    static void getObjectLabel_throwsOnBlankObject() {
+    static void objectLabelThrowsOnBlankObject() {
         try {
             SmartRelatedListController.getObjectLabel('');
             System.assert(false, 'Should have thrown');

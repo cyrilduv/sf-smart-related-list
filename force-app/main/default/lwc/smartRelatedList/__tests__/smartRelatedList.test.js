@@ -5,6 +5,17 @@ import getRelatedRecords from '@salesforce/apex/SmartRelatedListController.getRe
 import getColumnDefinitions from '@salesforce/apex/SmartRelatedListController.getColumnDefinitions';
 import getObjectLabel from '@salesforce/apex/SmartRelatedListController.getObjectLabel';
 
+// Mock Custom Labels
+jest.mock('@salesforce/label/c.SRL_Success', () => ({ default: 'Success' }), { virtual: true });
+jest.mock('@salesforce/label/c.SRL_RecordsUpdated', () => ({ default: 'Records updated.' }), { virtual: true });
+jest.mock('@salesforce/label/c.SRL_ErrorSavingRecords', () => ({ default: 'Error saving records' }), { virtual: true });
+jest.mock('@salesforce/label/c.SRL_ConfigError', () => ({ default: 'Configuration error: "Child Object API Name" and "Parent Field API Name" are required. Check the component properties in Lightning App Builder.' }), { virtual: true });
+jest.mock('@salesforce/label/c.SRL_InvalidColorRulesTitle', () => ({ default: 'Invalid Color Rules' }), { virtual: true });
+jest.mock('@salesforce/label/c.SRL_InvalidColorRulesMessage', () => ({ default: 'The colorRules JSON is malformed. Color coding will be disabled.' }), { virtual: true });
+jest.mock('@salesforce/label/c.SRL_NoRecordsFound', () => ({ default: 'No {0} records found.' }), { virtual: true });
+jest.mock('@salesforce/label/c.SRL_RelatedRecords', () => ({ default: 'Related Records' }), { virtual: true });
+jest.mock('@salesforce/label/c.SRL_ShowingRecords', () => ({ default: 'Showing {0}–{1} of {2} records' }), { virtual: true });
+
 // Mock Apex methods
 jest.mock(
     '@salesforce/apex/SmartRelatedListController.getRelatedRecords',

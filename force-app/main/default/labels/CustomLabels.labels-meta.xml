@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomLabels xmlns="http://soap.sforce.com/2006/04/metadata">
+    <labels>
+        <fullName>SRL_ObjectApiNameRequired</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Object API name is required</shortDescription>
+        <value>Object API name is required.</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_InvalidObjectApiName</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Invalid object API name</shortDescription>
+        <value>Invalid object API name</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_FieldApiNameRequired</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Field API name is required</shortDescription>
+        <value>Field API name is required.</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_InvalidField</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Invalid field</shortDescription>
+        <value>Invalid field</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_RecordsUpdated</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Records updated success message</shortDescription>
+        <value>Records updated.</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_ErrorSavingRecords</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Error saving records toast title</shortDescription>
+        <value>Error saving records</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_Success</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Success toast title</shortDescription>
+        <value>Success</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_ConfigError</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Configuration error message</shortDescription>
+        <value>Configuration error: "Child Object API Name" and "Parent Field API Name" are required. Check the component properties in Lightning App Builder.</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_InvalidColorRulesTitle</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Invalid color rules toast title</shortDescription>
+        <value>Invalid Color Rules</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_InvalidColorRulesMessage</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Invalid color rules toast message</shortDescription>
+        <value>The colorRules JSON is malformed. Color coding will be disabled.</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_NoRecordsFound</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>No records found empty state</shortDescription>
+        <value>No {0} records found.</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_RelatedRecords</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Default card header</shortDescription>
+        <value>Related Records</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+    <labels>
+        <fullName>SRL_ShowingRecords</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Pagination label</shortDescription>
+        <value>Showing {0}–{1} of {2} records</value>
+        <categories>SmartRelatedList</categories>
+    </labels>
+</CustomLabels>

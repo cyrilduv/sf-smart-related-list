@@ -8,6 +8,16 @@ import getRelatedRecords from '@salesforce/apex/SmartRelatedListController.getRe
 import getColumnDefinitions from '@salesforce/apex/SmartRelatedListController.getColumnDefinitions';
 import getObjectLabel from '@salesforce/apex/SmartRelatedListController.getObjectLabel';
 
+import labelSuccess from '@salesforce/label/c.SRL_Success';
+import labelRecordsUpdated from '@salesforce/label/c.SRL_RecordsUpdated';
+import labelErrorSaving from '@salesforce/label/c.SRL_ErrorSavingRecords';
+import labelConfigError from '@salesforce/label/c.SRL_ConfigError';
+import labelInvalidColorTitle from '@salesforce/label/c.SRL_InvalidColorRulesTitle';
+import labelInvalidColorMsg from '@salesforce/label/c.SRL_InvalidColorRulesMessage';
+import labelNoRecords from '@salesforce/label/c.SRL_NoRecordsFound';
+import labelRelatedRecords from '@salesforce/label/c.SRL_RelatedRecords';
+import labelShowingRecords from '@salesforce/label/c.SRL_ShowingRecords';
+
 const DEBOUNCE_MS = 300;
 const SERVER_ROW_LIMIT = 2000;
 
@@ -58,8 +68,7 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
 
     connectedCallback() {
         if (!this.childObjectApiName || !this.parentFieldApiName) {
-            this.errorMessage = 'Configuration error: "Child Object API Name" and "Parent Field API Name" are required. '
-                + 'Check the component properties in Lightning App Builder.';
+            this.errorMessage = labelConfigError;
             this.isLoading = false;
             return;
         }
@@ -124,7 +133,7 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
     // --- Computed properties ---
 
     get cardHeader() {
-        const label = this.title || this.objectLabel || this.childObjectApiName || 'Related Records';
+        const label = this.title || this.objectLabel || this.childObjectApiName || labelRelatedRecords;
         return `${label} · ${this.filteredRecords.length}`;
     }
 
@@ -138,14 +147,13 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
 
     get emptyMessage() {
         const label = this.objectLabel || this.childObjectApiName || '';
-        return `No ${label} records found.`;
+        return labelNoRecords.replace('{0}', label);
     }
 
     get hasUnsavedChanges() {
         return this.enableInlineEdit && this.draftValues.length > 0;
     }
 
-    // Strip editable flag when inline edit is off
     get activeColumns() {
         if (this.enableInlineEdit) {
             return this.columns;
@@ -214,7 +222,10 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         const total = this.filteredRecords.length;
         const start = Math.min((this.currentPage - 1) * this.rowLimit + 1, total);
         const end = Math.min(this.currentPage * this.rowLimit, total);
-        return `Showing ${start}–${end} of ${total} records`;
+        return labelShowingRecords
+            .replace('{0}', start)
+            .replace('{1}', end)
+            .replace('{2}', total);
     }
 
     // --- Event handlers ---
@@ -235,11 +246,15 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
     }
 
     handlePreviousPage() {
-        if (this.currentPage > 1) this.currentPage--;
+        if (this.currentPage > 1) {
+            this.currentPage--;
+        }
     }
 
     handleNextPage() {
-        if (this.currentPage < this.totalPages) this.currentPage++;
+        if (this.currentPage < this.totalPages) {
+            this.currentPage++;
+        }
     }
 
     handleNewRecord() {
@@ -291,14 +306,14 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         try {
             await Promise.all(promises);
             this.dispatchEvent(
-                new ShowToastEvent({ title: 'Success', message: 'Records updated.', variant: 'success' })
+                new ShowToastEvent({ title: labelSuccess, message: labelRecordsUpdated, variant: 'success' })
             );
             this.draftValues = [];
             await refreshApex(this._wiredRecordsResult);
         } catch (error) {
             this.dispatchEvent(
                 new ShowToastEvent({
-                    title: 'Error saving records',
+                    title: labelErrorSaving,
                     message: this._reduceError(error),
                     variant: 'error'
                 })
@@ -337,8 +352,14 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         });
 
         const csvString = '\uFEFF' + csvRows.join('\r\n');
-        const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvString);
-        window.open(encodedUri);
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${this.objectLabel || this.childObjectApiName || 'export'}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
     }
 
     // --- Private helpers ---
@@ -360,7 +381,6 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
                 def.editable = true;
             }
 
-            // Name column → clickable button for navigation
             if (col.fieldName === 'Name') {
                 def.type = 'button';
                 def.typeAttributes = {
@@ -421,8 +441,8 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
             );
             this.dispatchEvent(
                 new ShowToastEvent({
-                    title: 'Invalid Color Rules',
-                    message: 'The colorRules JSON is malformed. Color coding will be disabled.',
+                    title: labelInvalidColorTitle,
+                    message: labelInvalidColorMsg,
                     variant: 'warning'
                 })
             );
