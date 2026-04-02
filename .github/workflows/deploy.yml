@@ -1,0 +1,50 @@
+name: Deploy to Salesforce
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - production
+          - sandbox
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli
+
+      - name: Authenticate
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            echo "${{ secrets.SFDX_AUTH_URL_PROD }}" > auth.txt
+          else
+            echo "${{ secrets.SFDX_AUTH_URL_SANDBOX }}" > auth.txt
+          fi
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias target-org --set-default
+          rm auth.txt
+
+      - name: Deploy
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            sf project deploy start \
+              --target-org target-org \
+              --source-dir force-app \
+              --test-level RunSpecifiedTests \
+              --tests SmartRelatedListControllerTest \
+              --wait 30
+          else
+            sf project deploy start \
+              --target-org target-org \
+              --source-dir force-app \
+              --test-level RunSpecifiedTests \
+              --tests SmartRelatedListControllerTest \
+              --wait 30
+          fi

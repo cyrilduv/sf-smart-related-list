@@ -28,11 +28,26 @@ A fully configurable, reusable related list component for Salesforce Lightning r
 
 ### 1. Deploy to your org
 
-Click the button below to deploy directly to your Salesforce org (Production or Sandbox):
+Deploy via the GitHub Actions workflow — it runs only the required test class (`SmartRelatedListControllerTest`) instead of all tests in the org.
 
-<a href="https://githubsfdeploy.herokuapp.com?owner=cyrilduv&repo=sf-smart-related-list&ref=main">
-  <img alt="Deploy to Salesforce" src="https://raw.githubusercontent.com/afawcett/githubsfdeploy/master/deploy.png">
-</a>
+#### One-time setup
+
+1. Generate auth URLs for each target org:
+   ```bash
+   sf org display --target-org <prod-alias> --verbose
+   sf org display --target-org <sandbox-alias> --verbose
+   ```
+2. Copy the **Sfdx Auth Url** from each command output.
+3. In your GitHub repo, go to **Settings > Secrets and variables > Actions** and create:
+   - `SFDX_AUTH_URL_PROD` — paste the production auth URL
+   - `SFDX_AUTH_URL_SANDBOX` — paste the sandbox auth URL
+
+#### Run the deployment
+
+1. Go to the **Actions** tab in your GitHub repo.
+2. Select **Deploy to Salesforce** from the workflow list.
+3. Click **Run workflow**.
+4. Choose the target environment (**production** or **sandbox**) and click **Run workflow**.
 
 ### 2. Assign the permission set
 
