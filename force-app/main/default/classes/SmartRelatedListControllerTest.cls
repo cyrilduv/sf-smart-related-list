@@ -1,22 +1,5 @@
-/**
- * SmartRelatedListControllerTest
- *
- * Test class for SmartRelatedListController.
- * Uses Account → Contact as the test relationship.
- * Creates 15 Contacts under a single Account in @TestSetup.
- *
- * Coverage targets:
- *  - getColumnDefinitions: valid fields, empty fields (default), invalid object, picklist field
- *  - getRelatedRecords:    basic, offset, sort asc/desc, search, invalid object, blank object
- *  - getTotalCount:        all records, with search, invalid object
- *  - getObjectLabel:       valid object, invalid object
- */
 @IsTest
 private class SmartRelatedListControllerTest {
-
-    // ═════════════════════════════════════════════════════════════════════
-    //  TEST DATA
-    // ═════════════════════════════════════════════════════════════════════
 
     @TestSetup
     static void setupData() {
@@ -27,34 +10,33 @@ private class SmartRelatedListControllerTest {
         for (Integer i = 0; i < 15; i++) {
             contacts.add(new Contact(
                 FirstName = 'Test',
-                LastName  = 'Contact ' + i,
+                LastName  = 'Contact ' + String.valueOf(i).leftPad(2, '0'),
                 AccountId = acc.Id,
-                Email     = 'test' + i + '@example.com'
+                Email     = 'test' + i + '@example.com',
+                LeadSource = 'Web'
             ));
         }
         insert contacts;
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  getColumnDefinitions
-    // ═════════════════════════════════════════════════════════════════════
+    // --- getColumnDefinitions ---
 
     @IsTest
     static void getColumnDefinitions_returnsRequestedFields() {
         List<SmartRelatedListController.ColumnDef> defs =
             SmartRelatedListController.getColumnDefinitions('Contact', 'LastName,Email,Phone');
 
-        System.assertNotEquals(0, defs.size(), 'Should return column definitions');
+        System.assertEquals(3, defs.size(), 'Should return exactly 3 column definitions');
 
-        Boolean hasLastName = false;
+        Set<String> fieldNames = new Set<String>();
         for (SmartRelatedListController.ColumnDef d : defs) {
-            if (d.fieldName == 'LastName') {
-                hasLastName = true;
-                System.assertNotEquals(null, d.label, 'Label should be populated');
-                System.assertNotEquals(null, d.type, 'Type should be populated');
-            }
+            fieldNames.add(d.fieldName);
+            System.assertNotEquals(null, d.label, 'Label should be populated for ' + d.fieldName);
+            System.assertNotEquals(null, d.type, 'Type should be populated for ' + d.fieldName);
         }
-        System.assert(hasLastName, 'Should include the LastName column');
+        System.assert(fieldNames.contains('LastName'), 'Should include LastName');
+        System.assert(fieldNames.contains('Email'), 'Should include Email');
+        System.assert(fieldNames.contains('Phone'), 'Should include Phone');
     }
 
     @IsTest
@@ -62,33 +44,57 @@ private class SmartRelatedListControllerTest {
         List<SmartRelatedListController.ColumnDef> defs =
             SmartRelatedListController.getColumnDefinitions('Contact', '');
 
-        System.assertNotEquals(0, defs.size(), 'Should default to at least the Name field');
+        System.assertEquals(1, defs.size(), 'Should default to exactly one field');
+        System.assertEquals('Name', defs[0].fieldName, 'Default field should be Name');
     }
 
     @IsTest
     static void getColumnDefinitions_returnsPicklistValues() {
-        // LeadSource is a standard picklist on Contact
         List<SmartRelatedListController.ColumnDef> defs =
             SmartRelatedListController.getColumnDefinitions('Contact', 'LeadSource');
 
-        System.assertEquals(1, defs.size(), 'Should return one column');
-        System.assertNotEquals(null, defs[0].picklistValues, 'Should include picklist values');
-        System.assert(defs[0].picklistValues.size() > 0, 'Picklist values should not be empty');
+        System.assertEquals(1, defs.size());
+        System.assertEquals('PICKLIST', defs[0].type);
+        System.assertNotEquals(null, defs[0].picklistValues);
+        System.assert(defs[0].picklistValues.size() > 0);
+
+        SmartRelatedListController.PicklistOption firstOpt = defs[0].picklistValues[0];
+        System.assertNotEquals(null, firstOpt.label);
+        System.assertNotEquals(null, firstOpt.value);
     }
 
     @IsTest
     static void getColumnDefinitions_throwsOnInvalidObject() {
         try {
             SmartRelatedListController.getColumnDefinitions('FakeObject__x', 'Name');
-            System.assert(false, 'Should have thrown an exception');
+            System.assert(false, 'Should have thrown');
         } catch (AuraHandledException e) {
             System.assert(e.getMessage().contains('Invalid object'), e.getMessage());
         }
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  getRelatedRecords
-    // ═════════════════════════════════════════════════════════════════════
+    @IsTest
+    static void getColumnDefinitions_throwsOnInvalidField() {
+        try {
+            SmartRelatedListController.getColumnDefinitions('Contact', 'TotallyFakeField__c');
+            System.assert(false, 'Should have thrown');
+        } catch (AuraHandledException e) {
+            System.assert(e.getMessage().contains('Invalid field'), e.getMessage());
+        }
+    }
+
+    @IsTest
+    static void getColumnDefinitions_populatesUpdateableFlag() {
+        List<SmartRelatedListController.ColumnDef> defs =
+            SmartRelatedListController.getColumnDefinitions('Contact', 'LastName,AccountId');
+
+        for (SmartRelatedListController.ColumnDef d : defs) {
+            System.assertNotEquals(null, d.updateable,
+                'updateable flag should be set for ' + d.fieldName);
+        }
+    }
+
+    // --- getRelatedRecords ---
 
     @IsTest
     static void getRelatedRecords_respectsRowLimit() {
@@ -98,7 +104,7 @@ private class SmartRelatedListControllerTest {
             'Contact', 'AccountId', acc.Id, 'LastName,Email', 10, 0, null, null, null
         );
 
-        System.assertEquals(10, records.size(), 'Should return exactly rowLimit records');
+        System.assertEquals(10, records.size());
     }
 
     @IsTest
@@ -106,10 +112,10 @@ private class SmartRelatedListControllerTest {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
-            'Contact', 'AccountId', acc.Id, 'LastName,Email', 10, 10, null, null, null
+            'Contact', 'AccountId', acc.Id, 'LastName,Email', 100, 10, null, null, null
         );
 
-        System.assertEquals(5, records.size(), 'Should return the remaining 5 records after offset 10');
+        System.assertEquals(5, records.size());
     }
 
     @IsTest
@@ -117,10 +123,17 @@ private class SmartRelatedListControllerTest {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
-            'Contact', 'AccountId', acc.Id, 'LastName,Email', 15, 0, 'LastName', 'asc', null
+            'Contact', 'AccountId', acc.Id, 'LastName', 15, 0, 'LastName', 'asc', null
         );
 
-        System.assertNotEquals(0, records.size(), 'Should return sorted records');
+        System.assertEquals(15, records.size());
+        String prev = '';
+        for (SObject rec : records) {
+            String current = (String) rec.get('LastName');
+            System.assert(current >= prev,
+                'Expected ascending order, got "' + current + '" after "' + prev + '"');
+            prev = current;
+        }
     }
 
     @IsTest
@@ -131,7 +144,14 @@ private class SmartRelatedListControllerTest {
             'Contact', 'AccountId', acc.Id, 'LastName', 15, 0, 'LastName', 'desc', null
         );
 
-        System.assertNotEquals(0, records.size(), 'Should return desc-sorted records');
+        System.assertEquals(15, records.size());
+        String prev = 'zzzzz';
+        for (SObject rec : records) {
+            String current = (String) rec.get('LastName');
+            System.assert(current <= prev,
+                'Expected descending order, got "' + current + '" after "' + prev + '"');
+            prev = current;
+        }
     }
 
     @IsTest
@@ -139,19 +159,31 @@ private class SmartRelatedListControllerTest {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         List<SObject> records = SmartRelatedListController.getRelatedRecords(
-            'Contact', 'AccountId', acc.Id, 'LastName,Email', 50, 0, null, null, 'Contact 1'
+            'Contact', 'AccountId', acc.Id, 'LastName,Email', 50, 0, null, null, 'Contact 01'
         );
 
-        System.assert(records.size() > 0, 'Should return records matching the search term');
+        System.assertEquals(1, records.size());
+    }
+
+    @IsTest
+    static void getRelatedRecords_returnsIdField() {
+        Account acc = [SELECT Id FROM Account LIMIT 1];
+
+        List<SObject> records = SmartRelatedListController.getRelatedRecords(
+            'Contact', 'AccountId', acc.Id, 'LastName', 1, 0, null, null, null
+        );
+
+        System.assertEquals(1, records.size());
+        System.assertNotEquals(null, records[0].Id);
     }
 
     @IsTest
     static void getRelatedRecords_throwsOnInvalidObject() {
         try {
             SmartRelatedListController.getRelatedRecords(
-                'FakeObject__x', 'AccountId', '001000000000000', 'Name', 10, 0, null, null, null
+                'FakeObject__x', 'AccountId', UserInfo.getUserId(), 'Name', 10, 0, null, null, null
             );
-            System.assert(false, 'Should have thrown an exception');
+            System.assert(false, 'Should have thrown');
         } catch (AuraHandledException e) {
             System.assert(e.getMessage().contains('Invalid object'), e.getMessage());
         }
@@ -161,17 +193,54 @@ private class SmartRelatedListControllerTest {
     static void getRelatedRecords_throwsOnBlankObject() {
         try {
             SmartRelatedListController.getRelatedRecords(
-                '', 'AccountId', '001000000000000', 'Name', 10, 0, null, null, null
+                '', 'AccountId', UserInfo.getUserId(), 'Name', 10, 0, null, null, null
             );
-            System.assert(false, 'Should have thrown an exception');
+            System.assert(false, 'Should have thrown');
         } catch (AuraHandledException e) {
             System.assert(e.getMessage().contains('required'), e.getMessage());
         }
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  getTotalCount
-    // ═════════════════════════════════════════════════════════════════════
+    @IsTest
+    static void getRelatedRecords_throwsOnInvalidParentField() {
+        Account acc = [SELECT Id FROM Account LIMIT 1];
+        try {
+            SmartRelatedListController.getRelatedRecords(
+                'Contact', 'FakeFieldId__c', acc.Id, 'Name', 10, 0, null, null, null
+            );
+            System.assert(false, 'Should have thrown');
+        } catch (AuraHandledException e) {
+            System.assert(e.getMessage().contains('Invalid field'), e.getMessage());
+        }
+    }
+
+    @IsTest
+    static void getRelatedRecords_throwsOnInvalidSortField() {
+        Account acc = [SELECT Id FROM Account LIMIT 1];
+        try {
+            SmartRelatedListController.getRelatedRecords(
+                'Contact', 'AccountId', acc.Id, 'Name', 10, 0, 'FakeSort__c', 'asc', null
+            );
+            System.assert(false, 'Should have thrown');
+        } catch (AuraHandledException e) {
+            System.assert(e.getMessage().contains('Invalid field'), e.getMessage());
+        }
+    }
+
+    @IsTest
+    static void getRelatedRecords_throwsOnInvalidSelectField() {
+        Account acc = [SELECT Id FROM Account LIMIT 1];
+        try {
+            SmartRelatedListController.getRelatedRecords(
+                'Contact', 'AccountId', acc.Id, 'FakeColumn__c', 10, 0, null, null, null
+            );
+            System.assert(false, 'Should have thrown');
+        } catch (AuraHandledException e) {
+            System.assert(e.getMessage().contains('Invalid field'), e.getMessage());
+        }
+    }
+
+    // --- getTotalCount ---
 
     @IsTest
     static void getTotalCount_returnsAllRecords() {
@@ -181,7 +250,7 @@ private class SmartRelatedListControllerTest {
             'Contact', 'AccountId', acc.Id, null
         );
 
-        System.assertEquals(15, count, 'Should count all 15 contacts');
+        System.assertEquals(15, count);
     }
 
     @IsTest
@@ -189,43 +258,62 @@ private class SmartRelatedListControllerTest {
         Account acc = [SELECT Id FROM Account LIMIT 1];
 
         Integer count = SmartRelatedListController.getTotalCount(
-            'Contact', 'AccountId', acc.Id, 'Contact 1'
+            'Contact', 'AccountId', acc.Id, 'Contact 01'
         );
 
-        System.assert(count > 0, 'Should find at least one record matching the search term');
+        System.assertEquals(1, count);
     }
 
     @IsTest
     static void getTotalCount_throwsOnInvalidObject() {
         try {
             SmartRelatedListController.getTotalCount(
-                'FakeObject__x', 'AccountId', '001000000000000', null
+                'FakeObject__x', 'AccountId', UserInfo.getUserId(), null
             );
-            System.assert(false, 'Should have thrown an exception');
+            System.assert(false, 'Should have thrown');
         } catch (AuraHandledException e) {
             System.assert(e.getMessage().contains('Invalid object'), e.getMessage());
         }
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  getObjectLabel
-    // ═════════════════════════════════════════════════════════════════════
+    @IsTest
+    static void getTotalCount_throwsOnInvalidParentField() {
+        Account acc = [SELECT Id FROM Account LIMIT 1];
+        try {
+            SmartRelatedListController.getTotalCount(
+                'Contact', 'FakeFieldId__c', acc.Id, null
+            );
+            System.assert(false, 'Should have thrown');
+        } catch (AuraHandledException e) {
+            System.assert(e.getMessage().contains('Invalid field'), e.getMessage());
+        }
+    }
+
+    // --- getObjectLabel ---
 
     @IsTest
     static void getObjectLabel_returnsPluralLabel() {
         String label = SmartRelatedListController.getObjectLabel('Contact');
-
-        System.assertNotEquals(null, label, 'Should return a non-null label');
-        System.assert(label.length() > 0, 'Label should not be empty');
+        System.assertEquals('Contacts', label);
     }
 
     @IsTest
     static void getObjectLabel_throwsOnInvalidObject() {
         try {
             SmartRelatedListController.getObjectLabel('FakeObject__x');
-            System.assert(false, 'Should have thrown an exception');
+            System.assert(false, 'Should have thrown');
         } catch (AuraHandledException e) {
             System.assert(e.getMessage().contains('Invalid object'), e.getMessage());
+        }
+    }
+
+    @IsTest
+    static void getObjectLabel_throwsOnBlankObject() {
+        try {
+            SmartRelatedListController.getObjectLabel('');
+            System.assert(false, 'Should have thrown');
+        } catch (AuraHandledException e) {
+            System.assert(e.getMessage().contains('required'), e.getMessage());
         }
     }
 }

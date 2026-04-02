@@ -1,18 +1,3 @@
-/**
- * smartRelatedList — A fully configurable related list Lightning Web Component.
- *
- * Features:
- *  - Dynamic column definitions driven by App Builder configuration
- *  - Client-side search, sorting, and pagination
- *  - Inline editing with picklist support (via c-custom-datatable)
- *  - Row colour-coding using a configurable field + JSON colour rules
- *  - CSV export of all loaded records
- *  - "New" button to create child records pre-populated with the parent lookup
- *  - Row-level primary action button (e.g. "Edit") for quick record navigation
- *
- * @alias SmartRelatedList
- * @extends NavigationMixin(LightningElement)
- */
 import { LightningElement, api, wire, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { refreshApex } from '@salesforce/apex';
@@ -23,18 +8,10 @@ import getRelatedRecords from '@salesforce/apex/SmartRelatedListController.getRe
 import getColumnDefinitions from '@salesforce/apex/SmartRelatedListController.getColumnDefinitions';
 import getObjectLabel from '@salesforce/apex/SmartRelatedListController.getObjectLabel';
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
-/** Debounce delay (ms) for the search input to avoid excessive re-filtering. */
 const DEBOUNCE_MS = 300;
-
-/** Maximum number of records loaded from the server in a single wire call. */
 const SERVER_ROW_LIMIT = 2000;
 
-/**
- * Mapping of colour tokens (used in the colorRules JSON) to hex values.
- * Admins reference these tokens in App Builder — e.g. {"Hot":"red","Cold":"blue"}.
- */
+// Colour tokens admins use in colorRules JSON, e.g. {"Hot":"red","Cold":"blue"}
 const COLOR_MAP = {
     red: '#e74c3c',
     orange: '#e67e22',
@@ -42,70 +19,29 @@ const COLOR_MAP = {
     blue: '#2980b9',
     grey: '#95a5a6'
 };
-
-/** Fallback colour when a field value has no matching rule. */
 const DEFAULT_COLOR = COLOR_MAP.grey;
-
-// ── Component ────────────────────────────────────────────────────────────────
 
 export default class SmartRelatedList extends NavigationMixin(LightningElement) {
 
-    // ── App Builder properties (set by admins in Lightning App Builder) ───
-
-    /** Record Id of the parent record — auto-injected on record pages. */
+    // App Builder properties
     @api recordId;
-
-    /** Card header label (e.g. "Contacts"). */
     @api title;
-
-    /** API name of the child object to query (e.g. "Contact"). */
     @api childObjectApiName;
-
-    /** Lookup/master-detail field on the child that points to the parent (e.g. "AccountId"). */
     @api parentFieldApiName;
-
-    /** Comma-separated field API names to show as columns (e.g. "Name,Email,Phone"). */
     @api fieldsToDisplay;
-
-    /** Comma-separated field API names that should be sortable. Leave blank for all. */
     @api sortableFields;
-
-    /** Number of records displayed per page (default 10). */
     @api rowLimit = 10;
-
-    /** When true, renders a search bar above the table. */
     @api enableSearch = false;
-
-    /** When true, columns marked updateable become editable inline. */
     @api enableInlineEdit = false;
-
-    /** When true, shows a CSV export button in the toolbar. */
     @api enableExport = false;
-
-    /** API name of a text/picklist field whose value drives row colour-coding. */
     @api colorField;
-
-    /** JSON string mapping field values to colour tokens — e.g. {"Hot":"red","Warm":"orange"}. */
     @api colorRules;
-
-    /** Label for the row-level primary action button (e.g. "Edit"). Omit to hide. */
     @api primaryActionLabel;
-
-    /** When true, shows a "New" button that creates a child record pre-linked to the parent. */
     @api enableNewRecord = false;
 
-    // ── Reactive internal state ──────────────────────────────────────────
-
-    /** Column definitions passed to the datatable. */
     @track columns = [];
-
-    /** All records loaded from the server (enriched with computed fields). */
     @track allRecords = [];
-
-    /** Pending inline-edit changes tracked by the datatable. */
     @track draftValues = [];
-
-    // ── Non-reactive internal state ─────────────────────────────────────
 
     searchTerm = '';
     sortedBy;
@@ -115,21 +51,10 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
     errorMessage;
     objectLabel;
 
-    /** Cached wire result used by refreshApex after inline-edit save. */
     _wiredRecordsResult;
-
-    /** Timer handle for search debounce. */
     _debounceTimer;
-
-    /** Pre-computed Set of sortable field names, or null if all are sortable. */
     _sortableSet;
-
-    /** Parsed colorRules JSON object, or null when unconfigured / invalid. */
     _parsedColorRules;
-
-    // ═════════════════════════════════════════════════════════════════════
-    //  LIFECYCLE
-    // ═════════════════════════════════════════════════════════════════════
 
     connectedCallback() {
         this._sortableSet = this.sortableFields
@@ -139,14 +64,8 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         this._parsedColorRules = this._parseColorRules();
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  WIRE ADAPTERS
-    // ═════════════════════════════════════════════════════════════════════
+    // --- Wire adapters ---
 
-    /**
-     * Fetches the plural label for the child object (e.g. "Contacts").
-     * Used in the card header and empty-state message.
-     */
     @wire(getObjectLabel, { objectApiName: '$childObjectApiName' })
     wiredObjectLabel({ data, error }) {
         if (data) {
@@ -156,10 +75,6 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         }
     }
 
-    /**
-     * Fetches column metadata (label, type, updateable, picklist values)
-     * from Apex describe calls and builds the datatable column array.
-     */
     @wire(getColumnDefinitions, {
         objectApiName: '$childObjectApiName',
         fields: '$fieldsToDisplay'
@@ -173,10 +88,6 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         }
     }
 
-    /**
-     * Loads up to SERVER_ROW_LIMIT child records.
-     * All filtering, sorting, and pagination happens client-side.
-     */
     @wire(getRelatedRecords, {
         objectApiName: '$childObjectApiName',
         parentFieldApiName: '$parentFieldApiName',
@@ -201,42 +112,31 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         }
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  COMPUTED PROPERTIES — HEADER & STATE
-    // ═════════════════════════════════════════════════════════════════════
+    // --- Computed properties ---
 
-    /** Card title with record count badge — e.g. "Contacts · 12". */
     get cardHeader() {
         const label = this.title || this.objectLabel || this.childObjectApiName || 'Related Records';
         return `${label} · ${this.filteredRecords.length}`;
     }
 
-    /** True when column definitions have been loaded. */
     get hasColumns() {
         return this.columns && this.columns.length > 0;
     }
 
-    /** True when the table has loaded but contains zero rows. */
     get noData() {
         return !this.isLoading && this.filteredRecords.length === 0;
     }
 
-    /** Message shown in the empty state — e.g. "No Contacts records found." */
     get emptyMessage() {
         const label = this.objectLabel || this.childObjectApiName || '';
         return `No ${label} records found.`;
     }
 
-    /** True when inline edit is enabled and there are unsaved draft changes. */
     get hasUnsavedChanges() {
         return this.enableInlineEdit && this.draftValues.length > 0;
     }
 
-    /**
-     * Returns columns with or without the editable flag.
-     * When inline edit is disabled, strips editable from every column
-     * so the datatable renders in read-only mode.
-     */
+    // Strip editable flag when inline edit is off
     get activeColumns() {
         if (this.enableInlineEdit) {
             return this.columns;
@@ -248,15 +148,8 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         });
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  COMPUTED PROPERTIES — DATA PIPELINE
-    //  allRecords → filteredRecords → sortedRecords → paginatedRecords
-    // ═════════════════════════════════════════════════════════════════════
+    // Data pipeline: allRecords → filteredRecords → sortedRecords → paginatedRecords
 
-    /**
-     * Client-side filter: matches the search term against every visible
-     * field value in each row. Internal fields (prefixed with _) are skipped.
-     */
     get filteredRecords() {
         if (!this.searchTerm) {
             return this.allRecords;
@@ -271,10 +164,6 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         );
     }
 
-    /**
-     * Client-side sort on the currently filtered data.
-     * Supports string and numeric comparison with null-safe fallback.
-     */
     get sortedRecords() {
         const data = [...this.filteredRecords];
         if (!this.sortedBy) return data;
@@ -291,15 +180,10 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         });
     }
 
-    /** Slices the sorted data to the current page window. */
     get paginatedRecords() {
         const start = (this.currentPage - 1) * this.rowLimit;
         return this.sortedRecords.slice(start, start + this.rowLimit);
     }
-
-    // ═════════════════════════════════════════════════════════════════════
-    //  COMPUTED PROPERTIES — PAGINATION
-    // ═════════════════════════════════════════════════════════════════════
 
     get totalPages() {
         return Math.max(1, Math.ceil(this.filteredRecords.length / this.rowLimit));
@@ -313,12 +197,10 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         return this.currentPage >= this.totalPages;
     }
 
-    /** Only show pagination controls when records exceed a single page. */
     get showPagination() {
         return this.filteredRecords.length > this.rowLimit;
     }
 
-    /** Descriptive label — e.g. "Showing 1–10 of 42 records". */
     get paginationLabel() {
         const total = this.filteredRecords.length;
         const start = Math.min((this.currentPage - 1) * this.rowLimit + 1, total);
@@ -326,11 +208,8 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         return `Showing ${start}–${end} of ${total} records`;
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  EVENT HANDLERS — SEARCH, SORT, PAGINATION
-    // ═════════════════════════════════════════════════════════════════════
+    // --- Event handlers ---
 
-    /** Debounced handler for the search input — resets to page 1 on each change. */
     handleSearchChange(event) {
         clearTimeout(this._debounceTimer);
         const value = event.target.value;
@@ -341,7 +220,6 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         }, DEBOUNCE_MS);
     }
 
-    /** Handles column-header sort clicks from the datatable. */
     handleSort(event) {
         this.sortedBy = event.detail.fieldName;
         this.sortedDirection = event.detail.sortDirection;
@@ -355,14 +233,6 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         if (this.currentPage < this.totalPages) this.currentPage++;
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  EVENT HANDLERS — NAVIGATION
-    // ═════════════════════════════════════════════════════════════════════
-
-    /**
-     * Opens the standard "New" record form for the child object,
-     * pre-populating the parent lookup field with the current recordId.
-     */
     handleNewRecord() {
         this[NavigationMixin.Navigate]({
             type: 'standard__objectPage',
@@ -376,11 +246,6 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         });
     }
 
-    /**
-     * Handles row-level actions:
-     *  - navigate_to_record: opens the child record in view mode (same tab)
-     *  - primary_action: opens the child record in edit mode
-     */
     handleRowAction(event) {
         const actionName = event.detail.action.name;
         const row = event.detail.row;
@@ -405,20 +270,10 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         }
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  EVENT HANDLERS — INLINE EDIT
-    // ═════════════════════════════════════════════════════════════════════
-
-    /** Captures draft values on every cell change. */
     handleCellChange(event) {
         this.draftValues = event.detail.draftValues;
     }
 
-    /**
-     * Saves all pending draft values using Lightning Data Service (updateRecord).
-     * On success: shows a toast, clears drafts, and refreshes the wire cache.
-     * On failure: shows an error toast with the first failing field message.
-     */
     async handleSaveAll() {
         this.isLoading = true;
         const records = this.draftValues.map(draft => ({ fields: { ...draft } }));
@@ -444,31 +299,19 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         }
     }
 
-    /** Discards all pending inline-edit changes. */
     handleCancelEdit() {
         this.draftValues = [];
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  CSV EXPORT
-    // ═════════════════════════════════════════════════════════════════════
-
-    /**
-     * Builds a CSV string from ALL sorted records (not just the current page)
-     * and opens it in a new browser tab via a data: URI.
-     * A BOM character (\uFEFF) is prepended so Excel handles UTF-8 correctly.
-     */
     handleExportCsv() {
         const records = this.sortedRecords;
         if (!records.length) return;
 
-        // Exclude non-data columns (action menu, Name button)
         const exportCols = this.columns.filter(c => c.type !== 'action' && c.type !== 'button');
         const fieldApis = exportCols.map(c => c.fieldName);
         const headers = exportCols.map(c => c.label);
 
-        // The Name column is rendered as a button (type: 'button') so it was
-        // excluded above — re-add it as the first column in the CSV output.
+        // Name is rendered as a button column so it gets filtered out above — re-add it
         if (!fieldApis.includes('Name')) {
             fieldApis.unshift('Name');
             headers.unshift('Name');
@@ -489,23 +332,8 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         window.open(encodedUri);
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  PRIVATE HELPERS
-    // ═════════════════════════════════════════════════════════════════════
+    // --- Private helpers ---
 
-    /**
-     * Converts Apex ColumnDef objects into lightning-datatable column definitions.
-     *
-     * - Maps Salesforce field types to datatable types (text, number, date, etc.)
-     * - Marks columns as sortable based on the sortableFields config
-     * - Enables inline editing for updateable fields (picklists get the custom 'picklist' type)
-     * - Converts the Name column to a clickable button for same-tab navigation
-     * - Adds a colour-indicator style to the first column when colour rules are active
-     * - Appends a row-level action column when primaryActionLabel is configured
-     *
-     * @param {Array} columnDefs — ColumnDef objects from Apex
-     * @returns {Array} Column definitions for the datatable
-     */
     _buildColumns(columnDefs) {
         const cols = columnDefs.map((col, index) => {
             const def = {
@@ -515,19 +343,15 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
                 sortable: this._sortableSet ? this._sortableSet.has(col.fieldName) : true
             };
 
-            // Inline edit: use the custom 'picklist' type for picklist fields,
-            // standard editable: true for everything else
             if (this.enableInlineEdit && col.updateable) {
                 if (col.picklistValues && col.picklistValues.length > 0) {
                     def.type = 'picklist';
                     def.typeAttributes = { options: col.picklistValues };
-                    def.editable = true;
-                } else {
-                    def.editable = true;
                 }
+                def.editable = true;
             }
 
-            // Name column: render as a clickable button (navigates in same tab)
+            // Name column → clickable button for navigation
             if (col.fieldName === 'Name') {
                 def.type = 'button';
                 def.typeAttributes = {
@@ -538,7 +362,6 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
                 def.fieldName = 'Id';
             }
 
-            // Colour coding: apply an inline border-left style to the first column
             if (index === 0 && this.colorField && this._parsedColorRules) {
                 def.cellAttributes = {
                     style: { fieldName: '_rowColorStyle' }
@@ -548,7 +371,6 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
             return def;
         });
 
-        // Optional row-level action button (e.g. "Edit")
         if (this.primaryActionLabel) {
             cols.push({
                 type: 'action',
@@ -563,13 +385,6 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         return cols;
     }
 
-    /**
-     * Enriches raw SObject records with computed fields used by the template:
-     *  - _rowColorStyle: inline CSS for the colour-coded left border
-     *
-     * @param {Array} records — raw SObject records from the wire
-     * @returns {Array} Enriched record objects
-     */
     _enrichRecords(records) {
         return records.map(record => {
             const row = { ...record };
@@ -585,27 +400,27 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         });
     }
 
-    /**
-     * Safely parses the colorRules JSON string.
-     * Returns null on empty input or invalid JSON (no error thrown).
-     *
-     * @returns {Object|null} Parsed colour rules or null
-     */
     _parseColorRules() {
         if (!this.colorRules) return null;
         try {
             return JSON.parse(this.colorRules);
         } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error(
+                `[smartRelatedList] Invalid colorRules JSON: "${this.colorRules}". ` +
+                `Expected format: {"FieldValue":"colorToken"}. Error: ${e.message}`
+            );
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Invalid Color Rules',
+                    message: 'The colorRules JSON is malformed. Color coding will be disabled.',
+                    variant: 'warning'
+                })
+            );
             return null;
         }
     }
 
-    /**
-     * Maps a Salesforce Schema.DisplayType name to a lightning-datatable column type.
-     *
-     * @param {string} sfType — e.g. "STRING", "CURRENCY", "DATE"
-     * @returns {string} Datatable type — e.g. "text", "currency", "date"
-     */
     _mapFieldType(sfType) {
         const typeMap = {
             STRING: 'text',
@@ -626,12 +441,6 @@ export default class SmartRelatedList extends NavigationMixin(LightningElement) 
         return typeMap[sfType] || 'text';
     }
 
-    /**
-     * Extracts a human-readable message from various Apex/LDS error shapes.
-     *
-     * @param {Object|string} error — error from a wire adapter or imperative call
-     * @returns {string} Error message string
-     */
     _reduceError(error) {
         if (typeof error === 'string') return error;
         if (error?.body?.message) return error.body.message;

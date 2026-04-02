@@ -1,35 +1,13 @@
 /**
- * SmartRelatedListController
- *
  * Server-side controller for the smartRelatedList LWC.
- * Provides four cacheable endpoints:
- *  1. getColumnDefinitions — field metadata (label, type, updateable, picklist values)
- *  2. getRelatedRecords    — child records via dynamic SOQL
- *  3. getTotalCount        — total record count for pagination
- *  4. getObjectLabel       — plural label of the child object (e.g. "Contacts")
- *
- * Security:
- *  - "with sharing" enforces the running user's sharing rules on all queries.
- *  - Object API names are validated against Schema.getGlobalDescribe() before
- *    any SOQL is built, preventing SOQL injection via invalid object names.
- *  - All user-supplied strings in SOQL are escaped with String.escapeSingleQuotes().
- *  - Bind variables (:parentRecordId, :safeTerm) are used wherever possible.
+ * Uses "with sharing" for record-level access, validates all dynamic SOQL
+ * identifiers against Schema describe, and enforces FLS via stripInaccessible.
  */
 public with sharing class SmartRelatedListController {
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  COLUMN DEFINITIONS
-    // ═════════════════════════════════════════════════════════════════════
-
     /**
      * Returns column metadata for the given object and field list.
-     * Each ColumnDef includes the field label, API name, Salesforce type,
-     * whether the field is updateable, and — for picklist fields — the
-     * list of active picklist values (label + value).
-     *
-     * @param objectApiName  API name of the SObject (e.g. "Contact")
-     * @param fields         Comma-separated field API names (e.g. "Name,Email,Phone")
-     * @return List of ColumnDef objects
+     * Fields the running user cannot access are silently excluded.
      */
     @AuraEnabled(cacheable=true)
     public static List<ColumnDef> getColumnDefinitions(
@@ -48,17 +26,21 @@ public with sharing class SmartRelatedListController {
         for (String fieldApi : fieldList) {
             String trimmed = fieldApi.trim();
             Schema.SObjectField sField = fieldMap.get(trimmed.toLowerCase());
-            if (sField == null) continue;
+            if (sField == null) {
+                throw new AuraHandledException(
+                    'Invalid field "' + trimmed + '" on object ' + objectApiName
+                );
+            }
 
             Schema.DescribeFieldResult dfr = sField.getDescribe();
+            if (!dfr.isAccessible()) continue;
+
             ColumnDef cd = new ColumnDef();
             cd.label      = dfr.getLabel();
             cd.fieldName  = trimmed;
             cd.type       = dfr.getType().name();
             cd.updateable = dfr.isUpdateable();
 
-            // For picklist fields, include the active values so the LWC
-            // can render a dropdown instead of a plain text input.
             if (dfr.getType() == Schema.DisplayType.PICKLIST
                 || dfr.getType() == Schema.DisplayType.MULTIPICKLIST) {
                 cd.picklistValues = new List<PicklistOption>();
@@ -74,28 +56,10 @@ public with sharing class SmartRelatedListController {
         return defs;
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  RECORD DATA
-    // ═════════════════════════════════════════════════════════════════════
-
     /**
      * Queries child records related to a parent via dynamic SOQL.
-     * Supports server-side sorting, search (LIKE on Name), limit, and offset.
-     *
-     * The LWC currently loads all records (up to 2 000) in one call and performs
-     * filtering / sorting / pagination client-side. The parameters are exposed
-     * for future server-side pagination if needed.
-     *
-     * @param objectApiName     API name of the child object
-     * @param parentFieldApiName Lookup field on the child (e.g. "AccountId")
-     * @param parentRecordId    Id of the parent record
-     * @param fields            Comma-separated field API names to SELECT
-     * @param rowLimit          Maximum rows to return (LIMIT)
-     * @param offset            Number of rows to skip (OFFSET)
-     * @param sortField         Field API name to ORDER BY (optional)
-     * @param sortDirection     "asc" or "desc" (optional, defaults to ASC)
-     * @param searchTerm        Filters on Name LIKE '%term%' (optional)
-     * @return List of SObject records
+     * All field/object identifiers are validated against describe before query construction.
+     * Results are FLS-stripped before returning.
      */
     @AuraEnabled(cacheable=true)
     public static List<SObject> getRelatedRecords(
@@ -111,37 +75,47 @@ public with sharing class SmartRelatedListController {
     ) {
         validateObjectApiName(objectApiName);
 
-        // Build the field set — always include Id and Name
+        Map<String, Schema.SObjectField> fieldMap = Schema.getGlobalDescribe()
+            .get(objectApiName)
+            .getDescribe()
+            .fields.getMap();
+
+        validateFieldApiName(parentFieldApiName, fieldMap, objectApiName);
+
         List<String> fieldList = parseFieldList(fields);
-        Set<String> fieldSet = new Set<String>{ 'Id', 'Name' };
+        Set<String> fieldSet = new Set<String>{ 'Id' };
         for (String f : fieldList) {
-            fieldSet.add(f.trim());
+            String trimmed = f.trim();
+            validateFieldApiName(trimmed, fieldMap, objectApiName);
+            fieldSet.add(trimmed);
+        }
+
+        if (fieldMap.containsKey('name')) {
+            fieldSet.add('Name');
         }
 
         String fieldCsv = String.join(new List<String>(fieldSet), ', ');
 
-        // Assemble the query
         String query = 'SELECT ' + fieldCsv
-            + ' FROM ' + String.escapeSingleQuotes(objectApiName)
-            + ' WHERE ' + String.escapeSingleQuotes(parentFieldApiName) + ' = :parentRecordId';
+            + ' FROM ' + objectApiName
+            + ' WHERE ' + parentFieldApiName + ' = :parentRecordId';
 
-        // Optional Name search
-        if (String.isNotBlank(searchTerm)) {
-            String safeTerm = '%' + String.escapeSingleQuotes(searchTerm.trim()) + '%';
+        String safeTerm;
+        if (String.isNotBlank(searchTerm) && fieldMap.containsKey('name')) {
+            safeTerm = '%' + String.escapeSingleQuotes(searchTerm.trim()) + '%';
             query += ' AND Name LIKE :safeTerm';
         }
 
-        // Sorting
         if (String.isNotBlank(sortField)) {
-            String safeSort = String.escapeSingleQuotes(sortField.trim());
+            String trimmedSort = sortField.trim();
+            validateFieldApiName(trimmedSort, fieldMap, objectApiName);
             String dir = (sortDirection != null && sortDirection.equalsIgnoreCase('desc'))
                 ? 'DESC' : 'ASC';
-            query += ' ORDER BY ' + safeSort + ' ' + dir + ' NULLS LAST';
+            query += ' ORDER BY ' + trimmedSort + ' ' + dir + ' NULLS LAST';
         } else {
             query += ' ORDER BY CreatedDate DESC';
         }
 
-        // Pagination
         if (rowLimit != null && rowLimit > 0) {
             query += ' LIMIT ' + rowLimit;
         }
@@ -149,23 +123,10 @@ public with sharing class SmartRelatedListController {
             query += ' OFFSET ' + offset;
         }
 
-        return Database.query(query);
+        List<SObject> results = Database.query(query);
+        return Security.stripInaccessible(AccessType.READABLE, results).getRecords();
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  TOTAL COUNT
-    // ═════════════════════════════════════════════════════════════════════
-
-    /**
-     * Returns the total number of child records matching the parent and
-     * optional search term. Used for server-side pagination calculations.
-     *
-     * @param objectApiName     API name of the child object
-     * @param parentFieldApiName Lookup field on the child
-     * @param parentRecordId    Id of the parent record
-     * @param searchTerm        Optional Name LIKE filter
-     * @return Total record count
-     */
     @AuraEnabled(cacheable=true)
     public static Integer getTotalCount(
         String objectApiName,
@@ -175,28 +136,25 @@ public with sharing class SmartRelatedListController {
     ) {
         validateObjectApiName(objectApiName);
 
-        String query = 'SELECT COUNT() FROM ' + String.escapeSingleQuotes(objectApiName)
-            + ' WHERE ' + String.escapeSingleQuotes(parentFieldApiName) + ' = :parentRecordId';
+        Map<String, Schema.SObjectField> fieldMap = Schema.getGlobalDescribe()
+            .get(objectApiName)
+            .getDescribe()
+            .fields.getMap();
 
-        if (String.isNotBlank(searchTerm)) {
-            String safeTerm = '%' + String.escapeSingleQuotes(searchTerm.trim()) + '%';
+        validateFieldApiName(parentFieldApiName, fieldMap, objectApiName);
+
+        String query = 'SELECT COUNT() FROM ' + objectApiName
+            + ' WHERE ' + parentFieldApiName + ' = :parentRecordId';
+
+        String safeTerm;
+        if (String.isNotBlank(searchTerm) && fieldMap.containsKey('name')) {
+            safeTerm = '%' + String.escapeSingleQuotes(searchTerm.trim()) + '%';
             query += ' AND Name LIKE :safeTerm';
         }
 
         return Database.countQuery(query);
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  OBJECT LABEL
-    // ═════════════════════════════════════════════════════════════════════
-
-    /**
-     * Returns the plural label for the given object (e.g. "Contacts").
-     * Used in the card header and empty-state message.
-     *
-     * @param objectApiName  API name of the SObject
-     * @return Plural label string
-     */
     @AuraEnabled(cacheable=true)
     public static String getObjectLabel(String objectApiName) {
         validateObjectApiName(objectApiName);
@@ -206,14 +164,8 @@ public with sharing class SmartRelatedListController {
             .getLabelPlural();
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  PRIVATE HELPERS
-    // ═════════════════════════════════════════════════════════════════════
+    // --- Helpers ---
 
-    /**
-     * Splits a comma-separated field string into a trimmed list.
-     * Defaults to ['Name'] when the input is blank or empty.
-     */
     private static List<String> parseFieldList(String fields) {
         List<String> result = new List<String>();
         if (String.isNotBlank(fields)) {
@@ -230,10 +182,6 @@ public with sharing class SmartRelatedListController {
         return result;
     }
 
-    /**
-     * Validates that the given object API name exists in the org schema.
-     * Throws an AuraHandledException (surfaced to the LWC) if invalid.
-     */
     private static void validateObjectApiName(String objectApiName) {
         if (String.isBlank(objectApiName)) {
             throw new AuraHandledException('Object API name is required.');
@@ -244,14 +192,24 @@ public with sharing class SmartRelatedListController {
         }
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  INNER CLASSES
-    // ═════════════════════════════════════════════════════════════════════
+    // Prevents SOQL injection in field-name positions (SELECT, WHERE, ORDER BY)
+    private static void validateFieldApiName(
+        String fieldApiName,
+        Map<String, Schema.SObjectField> fieldMap,
+        String objectApiName
+    ) {
+        if (String.isBlank(fieldApiName)) {
+            throw new AuraHandledException('Field API name is required.');
+        }
+        if (!fieldMap.containsKey(fieldApiName.toLowerCase())) {
+            throw new AuraHandledException(
+                'Invalid field "' + fieldApiName + '" on object ' + objectApiName
+            );
+        }
+    }
 
-    /**
-     * Wrapper returned by getColumnDefinitions.
-     * Describes a single datatable column.
-     */
+    // --- Inner classes ---
+
     public class ColumnDef {
         @AuraEnabled public String label;
         @AuraEnabled public String fieldName;
@@ -260,10 +218,6 @@ public with sharing class SmartRelatedListController {
         @AuraEnabled public List<PicklistOption> picklistValues;
     }
 
-    /**
-     * Represents a single picklist entry (label + value)
-     * for use in the custom datatable picklist editor.
-     */
     public class PicklistOption {
         @AuraEnabled public String label;
         @AuraEnabled public String value;
